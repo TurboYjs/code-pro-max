@@ -12,6 +12,7 @@ import Link from 'next/link';
 import firebase from 'firebase/app';
 import { SharingPermissions } from '../src/components/SharingPermissions';
 import va from '@vercel/analytics';
+import {useSession} from "next-auth/react";
 
 function classNames(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
@@ -25,6 +26,7 @@ export const DEFAULT_COMPILER_OPTIONS = {
 
 export default function NewFilePage() {
   const { userData, firebaseUser } = useNullableUserContext();
+  const {data: authData} = useSession()
   const router = useRouter();
   const [lang, setLang] = useState<Language>('cpp');
   const [fileName, setFileName] = useState('');
@@ -34,19 +36,18 @@ export default function NewFilePage() {
   const [compilerOptions, setCompilerOptions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isPageLoading = !router.isReady || !userData || !firebaseUser;
+  const isPageLoading = !router.isReady || !authData;
 
   useEffect(() => {
     setCompilerOptions(DEFAULT_COMPILER_OPTIONS[lang]);
   }, [lang]);
 
-  useEffect(() => {
-    if (!isPageLoading) {
-      setLang(userData.defaultLanguage);
-      setDefaultPermission(userData.defaultPermission);
-    }
-  }, [isPageLoading]);
-
+  // useEffect(() => {
+  //   if (!isPageLoading) {
+  //     setLang(userData.defaultLanguage);
+  //     setDefaultPermission(userData.defaultPermission);
+  //   }
+  // }, [isPageLoading]);
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isPageLoading) {
@@ -62,11 +63,11 @@ export default function NewFilePage() {
     }
     setIsSubmitting(true);
     (async () => {
-      va.track('Create File', { type: 'new-file' });
-      firebase.database().ref(`users/${firebaseUser.uid}/data`).update({
-        defaultLanguage: lang,
-        defaultPermission: defaultPerimssion,
-      });
+      // va.track('Create File', { type: 'new-file' });
+      // firebase.database().ref(`users/${firebaseUser.uid}/data`).update({
+      //   defaultLanguage: lang,
+      //   defaultPermission: defaultPerimssion,
+      // });
       const resp = await fetch(`/api/createNewFile`, {
         method: 'POST',
         headers: {
@@ -74,8 +75,8 @@ export default function NewFilePage() {
         },
         body: JSON.stringify({
           workspaceName: fileName,
-          userID: firebaseUser.uid,
-          userName: firebaseUser.displayName,
+          userID: authData?.user?.id,
+          userName: authData?.user?.name,
           defaultPermission: defaultPerimssion,
           language: lang,
           compilerOptions: {
@@ -83,12 +84,17 @@ export default function NewFilePage() {
             [lang]: compilerOptions,
           },
         }),
+      }).finally(()=> {
+        setIsSubmitting(false);
       });
       const data = await resp.json();
       if (resp.ok) {
-        router.push(`/${data.fileID.substring(1)}`);
+        router.push(`/${data.fileID}`);
       } else {
         alert('Error: ' + data.message);
+        if (data.message === 'TOKEN_EXPIRED') {
+          router.push("/Login")
+        }
       }
     })();
   };

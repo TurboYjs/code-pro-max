@@ -6,7 +6,7 @@ import {
   signInWithGoogleAtom,
   signOutAtom,
 } from '../../atoms/firebaseUserAtoms';
-import { useConnectionContext } from '../../context/ConnectionContext';
+// import { useConnectionContext } from '../../context/ConnectionContext';
 import { isFirebaseId } from '../../editorUtils';
 import FilesList, { File } from './FilesList';
 import { SharingPermissions } from '../SharingPermissions';
@@ -18,17 +18,21 @@ import {
 } from '../../context/UserContext';
 import { MessagePage } from '../MessagePage';
 import Link from 'next/link';
+import {signOut, useSession} from "next-auth/react";
+import {directus} from "@/services/directus";
+import {readItems} from "@directus/sdk";
 
 export default function Dashboard() {
+  const {data} = useSession()
   const { firebaseUser, userData } = useUserContext();
 
   const signInWithGoogle = useUpdateAtom(signInWithGoogleAtom);
-  const signOut = useUpdateAtom(signOutAtom);
+  // const signOut = useUpdateAtom(signOutAtom);
 
   const [files, setFiles] = useState<File[] | null>(null);
   const [showHidden, setShowHidden] = useState<boolean>(false);
   const router = useRouter();
-  const connectionContext = useConnectionContext();
+  // const connectionContext = useConnectionContext();
   // const makeNewClassroomWithName = async (name: string) => {
   //   if (!firebaseUser) return;
   //   const resp = await fetch(`/api/createNewClassroom`, {
@@ -50,56 +54,95 @@ export default function Dashboard() {
   //   }
   // };
 
-  useEffect(() => {
-    if (!firebaseUser) return;
-
-    const ref = firebase
-      .database()
-      .ref('users')
-      .child(firebaseUser.uid)
-      .child('files');
-    const unsubscribe = ref.orderByChild('lastAccessTime').on('value', snap => {
-      if (!snap.exists) {
-        setFiles([]);
-      } else {
-        const files: File[] = [];
-        snap.forEach(child => {
-          const data = child.val();
-          const key = child.key;
-          firebase
-            .database()
-            .ref('files/' + key)
-            .on('value', snapp => {
-              if (snapp.exists()) {
-                ref.child(key + '/language').set(snapp.val().settings.language);
-              }
-            });
-
-          if (!showHidden && data.hidden) return;
-          if (key?.startsWith('-') && isFirebaseId(key.substring(1))) {
-            files.push({
-              id: key,
-              ...data,
-            });
+  // useEffect(() => {
+  //   if (!firebaseUser) return;
+  //
+  //   const ref = firebase
+  //     .database()
+  //     .ref('users')
+  //     .child(firebaseUser.uid)
+  //     .child('files');
+  //   const unsubscribe = ref.orderByChild('lastAccessTime').on('value', snap => {
+  //     if (!snap.exists) {
+  //       setFiles([]);
+  //     } else {
+  //       const files: File[] = [];
+  //       snap.forEach(child => {
+  //         const data = child.val();
+  //         const key = child.key;
+  //         firebase
+  //           .database()
+  //           .ref('files/' + key)
+  //           .on('value', snapp => {
+  //             if (snapp.exists()) {
+  //               ref.child(key + '/language').set(snapp.val().settings.language);
+  //             }
+  //           });
+  //
+  //         if (!showHidden && data.hidden) return;
+  //         if (key?.startsWith('-') && isFirebaseId(key.substring(1))) {
+  //           files.push({
+  //             id: key,
+  //             ...data,
+  //           });
+  //         }
+  //       });
+  //       files.reverse();
+  //       setFiles(files);
+  //       // const yourOwnedFiles: File[] = [];
+  //       // const yourOtherFiles: File[] = [];
+  //       // for (const file of yourFiles) {
+  //       //   if (file.hidden && !showHidden) continue;
+  //       //   if (file.lastPermission === 'OWNER') {
+  //       //     yourOwnedFiles.push(file);
+  //       //   } else {
+  //       //     yourOtherFiles.push(file);
+  //       //   }
+  //       // }
+  //       // setOwnedFiles(yourOwnedFiles);
+  //     }
+  //   });
+  //   return () => ref.off('value', unsubscribe);
+  // }, [firebaseUser, showHidden]);
+  const fetchFiles = async ()=> {
+      const client = directus(data?.user?.access_token ?? "")
+      const res = await client.request(readItems('files', {
+          user_created: data?.user?.id,
+          fields: ['*', {
+              user_created: ['*']
+          }]
+      })).catch(async e => {
+          if (e?.errors?.[0]?.extensions?.code === 'TOKEN_EXPIRED') {
+              await signOut()
+              return  router.push("/Login")
           }
-        });
-        files.reverse();
-        setFiles(files);
-        // const yourOwnedFiles: File[] = [];
-        // const yourOtherFiles: File[] = [];
-        // for (const file of yourFiles) {
-        //   if (file.hidden && !showHidden) continue;
-        //   if (file.lastPermission === 'OWNER') {
-        //     yourOwnedFiles.push(file);
-        //   } else {
-        //     yourOtherFiles.push(file);
-        //   }
-        // }
-        // setOwnedFiles(yourOwnedFiles);
-      }
-    });
-    return () => ref.off('value', unsubscribe);
-  }, [firebaseUser, showHidden]);
+      })
+      setFiles(res.filter(r => {
+          if (showHidden) {
+              return true
+          }
+          return !r.hidden
+      }))
+  }
+  useEffect( () => {
+      if (!data) return
+      fetchFiles()
+  }, [data, showHidden])
+  if (!data) {
+      return
+  }
+  const setFile = (file: File) => {
+      setFiles(files?.map(f => {
+          if (f.id === file.id) {
+              return {
+                  ...f,
+                  hidden: !f.hidden
+              }
+          }
+          return  f
+      })??[])
+  }
+  console.log(data)
 
   return (
     <div>
@@ -111,27 +154,27 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {firebaseUser.isAnonymous ? (
-        <div className="text-gray-400 mt-6">
-          Not signed in.{' '}
-          <button
-            className="underline text-gray-200 focus:outline-none hover:bg-gray-700 p-1 leading-none transition"
-            onClick={() => signInWithGoogle(connectionContext)}
-          >
-            Sign in now
-          </button>
-        </div>
-      ) : (
-        <div className="text-gray-400 mt-6">
-          Signed in as {firebaseUser.displayName}.
-          <button
-            className="underline text-gray-200 focus:outline-none hover:bg-gray-700 p-1 leading-none transition"
-            onClick={() => signOut(connectionContext)}
-          >
-            Sign Out
-          </button>
-        </div>
-      )}
+      {/*{firebaseUser.isAnonymous ? (*/}
+      {/*  <div className="text-gray-400 mt-6">*/}
+      {/*    Not signed in.{' '}*/}
+      {/*    <button*/}
+      {/*      className="underline text-gray-200 focus:outline-none hover:bg-gray-700 p-1 leading-none transition"*/}
+      {/*      onClick={() => signInWithGoogle(connectionContext)}*/}
+      {/*    >*/}
+      {/*      Sign in now*/}
+      {/*    </button>*/}
+      {/*  </div>*/}
+      {/*) : (*/}
+      {/*  <div className="text-gray-400 mt-6">*/}
+      {/*    Signed in as {firebaseUser.displayName}.*/}
+      {/*    <button*/}
+      {/*      className="underline text-gray-200 focus:outline-none hover:bg-gray-700 p-1 leading-none transition"*/}
+      {/*      onClick={() => signOut(connectionContext)}*/}
+      {/*    >*/}
+      {/*      Sign Out*/}
+      {/*    </button>*/}
+      {/*  </div>*/}
+      {/*)}*/}
 
       <div className="h-12"></div>
 
@@ -159,7 +202,7 @@ export default function Dashboard() {
       <div className="h-6"></div>
 
       {files && files.length > 0 && (
-        <FilesList files={files} showPerms={false} />
+        <FilesList files={files} showPerms={false} setFile={setFile}/>
       )}
 
       {!files && <div className="text-gray-400">Loading files...</div>}

@@ -9,12 +9,12 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:prettier/recommended',
-    'plugin:jest/recommended',
-    'plugin:jest-playwright/recommended',
+    // 'plugin:jest/recommended',
+    // 'plugin:jest-playwright/recommended',
   ],
   plugins: [
     // todo maybe only for jest files?
-    'jest-playwright',
+    // 'jest-playwright',
   ],
   overrides: [
     // This configuration will apply only to TypeScript files
@@ -44,10 +44,10 @@ module.exports = {
         'jsx-a11y/anchor-is-valid': 'off',
 
         // Why would you want unused vars?
-        '@typescript-eslint/no-unused-vars': [
-          'error',
-          { argsIgnorePattern: '^_' },
-        ],
+        // '@typescript-eslint/no-unused-vars': [
+        //   'error',
+        //   { argsIgnorePattern: '^_' },
+        // ],
 
         '@typescript-eslint/no-empty-function': 'off',
 

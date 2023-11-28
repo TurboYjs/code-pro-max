@@ -36,28 +36,28 @@ export default function useUpdateUserDashboard() {
     // Shouldn't happen, but just in case...
     if (!fileData.id) throw new Error('fileData.id was null');
 
-    const fileRef = firebase
-      .database()
-      .ref('users')
-      .child(userData.id)
-      .child('files')
-      .child(fileData.id);
-
-    if (permission === 'PRIVATE') {
-      // remove from dashboard recently accessed files
-      fileRef.remove();
-    } else {
-      fileRef.set({
-        title: settings.workspaceName || '',
-        lastAccessTime: firebase.database.ServerValue.TIMESTAMP,
-        creationTime: settings.creationTime ?? null,
-        lastPermission: permission,
-        lastDefaultPermission: settings.defaultPermission,
-        hidden: false,
-        version: 2,
-        ...(fileOwner ? { owner: fileOwner } : {}),
-      });
-    }
+    // const fileRef = firebase
+    //   .database()
+    //   .ref('users')
+    //   .child(userData.id)
+    //   .child('files')
+    //   .child(fileData.id);
+    //
+    // if (permission === 'PRIVATE') {
+    //   // remove from dashboard recently accessed files
+    //   fileRef.remove();
+    // } else {
+    //   fileRef.set({
+    //     title: settings.workspaceName || '',
+    //     lastAccessTime: firebase.database.ServerValue.TIMESTAMP,
+    //     creationTime: settings.creationTime ?? null,
+    //     lastPermission: permission,
+    //     lastDefaultPermission: settings.defaultPermission,
+    //     hidden: false,
+    //     version: 2,
+    //     ...(fileOwner ? { owner: fileOwner } : {}),
+    //   });
+    // }
   }, [
     permission,
     settings.workspaceName,

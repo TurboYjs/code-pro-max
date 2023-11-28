@@ -9,6 +9,7 @@ import type firebaseType from 'firebase';
 import firebase from 'firebase/app';
 import { signInAnonymously } from '../scripts/firebaseUtils';
 import animals from '../scripts/animals';
+import {useSession} from "next-auth/react";
 
 export type Language = 'cpp' | 'java' | 'py';
 export const LANGUAGES: { label: string; value: Language }[] = [
@@ -65,52 +66,52 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   );
   const [_, triggerRerender] = useState<number>(0);
 
-  useEffect(() => {
-    const unsubscribe = firebase.auth().onAuthStateChanged(user => {
-      if (!user) {
-        setUserData(null);
-        signInAnonymously();
-      } else {
-        let displayName = user.displayName;
-        if (!displayName) {
-          displayName =
-            'Anonymous ' + animals[Math.floor(animals.length * Math.random())];
-          user.updateProfile({ displayName }).then(() => setUser(user));
-        } else {
-          setUser(user);
-        }
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const handleSnapshot = (snap: firebaseType.database.DataSnapshot) => {
-      const data = snap.val() ?? {};
-      setUserData({
-        id: user.uid,
-        editorMode: data.editorMode ?? 'Normal',
-        tabSize: data.tabSize ?? 4,
-        lightMode: data.lightMode ?? false,
-        defaultPermission: data.defaultPermission ?? 'READ_WRITE',
-        defaultLanguage: data.defaultLanguage ?? 'cpp',
-      });
-    };
-    firebase
-      .database()
-      .ref(`users/${user.uid}/data`)
-      .on('value', handleSnapshot);
-    return () =>
-      firebase
-        .database()
-        .ref(`users/${user.uid}/data`)
-        .off('value', handleSnapshot);
-  }, [user]);
+  // useEffect(() => {
+  //   const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+  //     if (!user) {
+  //       setUserData(null);
+  //       signInAnonymously();
+  //     } else {
+  //       let displayName = user.displayName;
+  //       if (!displayName) {
+  //         displayName =
+  //           'Anonymous ' + animals[Math.floor(animals.length * Math.random())];
+  //         user.updateProfile({ displayName }).then(() => setUser(user));
+  //       } else {
+  //         setUser(user);
+  //       }
+  //     }
+  //   });
+  //
+  //   return () => {
+  //     unsubscribe();
+  //   };
+  // }, []);
+  //
+  // useEffect(() => {
+  //   if (!user) return;
+  //
+  //   const handleSnapshot = (snap: firebaseType.database.DataSnapshot) => {
+  //     const data = snap.val() ?? {};
+  //     setUserData({
+  //       id: user.uid,
+  //       editorMode: data.editorMode ?? 'Normal',
+  //       tabSize: data.tabSize ?? 4,
+  //       lightMode: data.lightMode ?? false,
+  //       defaultPermission: data.defaultPermission ?? 'READ_WRITE',
+  //       defaultLanguage: data.defaultLanguage ?? 'cpp',
+  //     });
+  //   };
+  //   firebase
+  //     .database()
+  //     .ref(`users/${user.uid}/data`)
+  //     .on('value', handleSnapshot);
+  //   return () =>
+  //     firebase
+  //       .database()
+  //       .ref(`users/${user.uid}/data`)
+  //       .off('value', handleSnapshot);
+  // }, [user]);
 
   const updateUsername = useCallback(
     (newName: string) => {
@@ -123,6 +124,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     },
     [user]
   );
+
 
   return (
     <UserContext.Provider
@@ -143,9 +145,10 @@ export function useNullableUserContext() {
 
 export function useUserContext() {
   const { firebaseUser, userData, updateUsername } = useNullableUserContext();
-  if (!firebaseUser || !userData)
-    throw new Error(
-      "useUserContext() can only be called after UserProvider has finished loading. If you want to access userContext while it's still loading, use useNullableUserContext() instead"
-    );
-  return { firebaseUser, userData, updateUsername };
+  const {data} = useSession()
+  // if (!firebaseUser || !userData)
+  //   throw new Error(
+  //     "useUserContext() can only be called after UserProvider has finished loading. If you want to access userContext while it's still loading, use useNullableUserContext() instead"
+  //   );
+  return { firebaseUser, userData: data?.user??{}, updateUsername };
 }

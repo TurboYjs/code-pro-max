@@ -61,22 +61,6 @@ export const NavBar = (props: DesktopNavBarProps): JSX.Element => {
       </div>
       {props.runButton}
       <div className="flex items-center divide-x divide-gray-700">
-        <a
-          href="https://github.com/cpinitiative/ide/issues"
-          target="_blank"
-          className="px-4 py-2 text-gray-400 hover:text-gray-200 text-sm font-medium flex-shrink-0"
-          rel="noreferrer"
-        >
-          Report an Issue
-        </a>
-        <a
-          href="https://github.com/cpinitiative/ide"
-          target="_blank"
-          rel="noreferrer"
-          className="px-4 py-2 text-gray-400 hover:text-gray-200 text-sm font-medium flex-shrink-0"
-        >
-          Star this on Github!
-        </a>
         {props.showViewOnly && (
           <span className="px-4 py-2 text-gray-400 text-sm font-medium">
             View Only

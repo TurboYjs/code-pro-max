@@ -7,7 +7,7 @@ dayjs.extend(relativeTime);
 import firebase from 'firebase/app';
 
 export type File = {
-  id: string;
+  id: number;
   lastAccessTime: number;
   title: string;
   creationTime: number | null;
@@ -25,12 +25,17 @@ export type File = {
 export interface FilesListProps {
   files: File[];
   showPerms: boolean;
+  setFile: Function
 }
 
 import { permissionLabels } from '../UserList/UserListItem';
 import { useAtomValue } from 'jotai/utils';
 import invariant from 'tiny-invariant';
 import { useUserContext } from '../../context/UserContext';
+import {signOut, useSession} from "next-auth/react";
+import {directus} from "@/services/directus";
+import {readItems, updateItem} from "@directus/sdk";
+import {useRouter} from "next/router";
 
 export const sharingPermissionLabels: Record<string, string> = {
   READ_WRITE: 'Public Read & Write',
@@ -39,8 +44,9 @@ export const sharingPermissionLabels: Record<string, string> = {
 };
 
 export default function FilesList(props: FilesListProps): JSX.Element {
-  const { firebaseUser } = useUserContext();
-  invariant(!!firebaseUser);
+  // const { firebaseUser } = useUserContext();
+  // invariant(!!firebaseUser);
+  const {data } = useSession()
   const formatCreationTime = (creationTime: number | null): string => {
     if (!creationTime) return 'Unknown';
     // return String(creationTime);
@@ -57,15 +63,26 @@ export default function FilesList(props: FilesListProps): JSX.Element {
     if (language == 'cpp') return 'C++';
     return 'Unknown';
   };
+  const router = useRouter()
 
-  const handleToggleHideFile = (file: File) => {
-    const ref = firebase
-      .database()
-      .ref('users')
-      .child(firebaseUser.uid)
-      .child('files')
-      .child(file.id);
-    ref.update({ hidden: !file.hidden });
+  const handleToggleHideFile = async (file: File) => {
+    // const ref = firebase
+    //   .database()
+    //   .ref('users')
+    //   .child(firebaseUser.uid)
+    //   .child('files')
+    //   .child(file.id);
+    // ref.update({ hidden: !file.hidden });
+    const client = directus(data?.user?.access_token ?? "")
+    const res = await client.request(updateItem('files',file.id, {
+      hidden: !file.hidden
+    })).catch(async e => {
+      if (e?.errors?.[0]?.extensions?.code === 'TOKEN_EXPIRED') {
+        await signOut()
+        return router.push("/Login")
+      }
+    })
+    props.setFile(file)
   };
 
   return (
@@ -128,27 +145,27 @@ export default function FilesList(props: FilesListProps): JSX.Element {
                         {file.title || '(Unnamed File)'} (Hidden)
                       </span>
                     ) : (
-                      <Link href={`/${file.id.substring(1)}`}>
+                      <Link href={`/${file.id}`}>
                         <a className="text-gray-100 hover:text-white">
-                          {file.title || '(Unnamed File)'}
+                          {file.settings?.workspaceName || '(Unnamed File)'}
                         </a>
                       </Link>
                     )}
                   </td>
                   <td className="whitespace-nowrap py-4 px-3 text-sm text-gray-400">
-                    {dayjs(file.lastAccessTime).fromNow()}
+                    {dayjs(file.date_updated || file.date_created).fromNow()}
                   </td>
                   <td className="whitespace-nowrap py-4 px-3 text-sm text-gray-400">
-                    {formatCreationTime(file.creationTime)}
+                    {formatCreationTime(file.date_created)}
                   </td>
                   <td className="whitespace-nowrap py-4 px-3 text-sm text-gray-400">
-                    {formatLanguage(file.language)}
+                    {formatLanguage(file.settings.language)}
                   </td>
                   <td className="whitespace-nowrap py-4 px-3 text-sm text-gray-400">
-                    {file.owner
-                      ? file.owner.id === firebaseUser.uid
+                    {file.user_created
+                      ? file.user_created.id === data?.user.id
                         ? 'Me'
-                        : file.owner.name
+                        : `${file.user_created.first_name} ${file.user_created.last_name}`
                       : ''}
                   </td>
                   <td className="whitespace-nowrap py-4 px-3 text-sm text-gray-400">

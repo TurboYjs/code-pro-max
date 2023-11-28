@@ -15,6 +15,10 @@ import {
 import { ProblemData } from '../components/Workspace/Workspace';
 import { ChatMessage } from '../components/Chat';
 import { useUserContext } from './UserContext';
+import {signOut, useSession} from "next-auth/react";
+import {directus} from "@/services/directus";
+import {readItem, updateItem, updateMe} from "@directus/sdk";
+import {useRouter} from "next/router";
 
 export type Language = 'cpp' | 'java' | 'py';
 
@@ -90,43 +94,62 @@ export function EditorProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const { userData } = useUserContext();
+  const {data} = useSession()
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const doNotInitializeTheseFileIdsRef = useRef<Record<string, boolean>>({});
-
+  const router = useRouter()
   useEffect(() => {
     setLoading(true);
 
-    const handleDataChange = (snap: firebase.database.DataSnapshot) => {
-      setLoading(false);
-      setFileData(
-        snap.exists()
-          ? {
-              id: snap.key,
-              ...snap.val(),
-            }
-          : null
-      );
-    };
-
-    firebase
-      .database()
-      .ref('files/' + fileId)
-      .on('value', handleDataChange);
-
-    return () =>
-      firebase
-        .database()
-        .ref('files/' + fileId)
-        .off('value', handleDataChange);
+    // const handleDataChange = (snap: firebase.database.DataSnapshot) => {
+    //   setLoading(false);
+    //   setFileData(
+    //     snap.exists()
+    //       ? {
+    //           id: snap.key,
+    //           ...snap.val(),
+    //         }
+    //       : null
+    //   );
+    // };
+    //
+    // firebase
+    //   .database()
+    //   .ref('files/' + fileId)
+    //   .on('value', handleDataChange);
+    //
+    // return () =>
+    //   firebase
+    //     .database()
+    //     .ref('files/' + fileId)
+    //     .off('value', handleDataChange);
+    const client = directus(data?.user?.access_token ?? "")
+    client.request(readItem('files', fileId)).then(r => {
+      setLoading(false)
+      setFileData(r)
+    }).catch(async e => {
+      if (e?.errors?.[0]?.extensions?.code === 'TOKEN_EXPIRED') {
+        await signOut()
+        router.push("/Login")
+      }
+      setLoading(false)
+    })
   }, [fileId]);
 
   const updateFileData = useCallback(
     (firebaseUpdateData: Object) => {
-      return firebase
-        .database()
-        .ref('files/' + fileId)
-        .update(firebaseUpdateData);
+      // return firebase
+      //   .database()
+      //   .ref('files/' + fileId)
+      //   .update(firebaseUpdateData);
+      const client = directus(data?.user?.access_token ?? "")
+      client.request(updateItem('files', fileId, firebaseUpdateData)).catch(async e => {
+        if (e?.errors?.[0]?.extensions?.code === 'TOKEN_EXPIRED') {
+          await signOut()
+          return router.push("/Login")
+        }
+      })
     },
     [fileId]
   );
@@ -144,7 +167,7 @@ export function EditorProvider({
   }
 
   const userPermission =
-    editorContextValue.fileData.users[userData.id]?.permission ??
+    editorContextValue.fileData.users[data?.user?.id??'']?.permission ??
     editorContextValue.fileData.settings.defaultPermission;
 
   if (userPermission === 'PRIVATE') {

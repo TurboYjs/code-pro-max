@@ -21,8 +21,8 @@ export interface RealtimeEditorProps extends EditorProps {
 }
 
 const WEBSOCKET_SERVER = SHOULD_USE_DEV_YJS_SERVER
-  ? 'ws://localhost:1234'
-  : 'wss://yjs.usaco.guide:443';
+  ? 'ws://localhost:3000'
+  : 'wss://guxukai.tech/websocket';
 
 const RealtimeEditor = ({
   onMount,
@@ -45,7 +45,7 @@ const RealtimeEditor = ({
   const [isSynced, setIsSynced] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!editor || !firebaseUser) return;
+    if (!editor || !userData) return;
 
     const { path } = props;
     const affectsLoading =
@@ -63,7 +63,7 @@ const RealtimeEditor = ({
 
     // Set the cursor color
     // Note that this is actually stored in firebase, but for now we'll just use this
-    provider.awareness.setLocalStateField('firebaseUserID', firebaseUser.uid);
+    provider.awareness.setLocalStateField('firebaseUserID', userData.id);
 
     // Bind Yjs to the editor model
     const monacoText = ydocument.getText('monaco');

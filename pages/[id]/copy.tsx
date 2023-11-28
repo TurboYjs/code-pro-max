@@ -4,15 +4,16 @@ import { MessagePage } from '../../src/components/MessagePage';
 import { useRouter } from 'next/router';
 import invariant from 'tiny-invariant';
 import { useNullableUserContext } from '../../src/context/UserContext';
+import {useSession} from "next-auth/react";
 
 export default function CopyFilePage(): JSX.Element {
   const router = useRouter();
-
+  const {data} = useSession()
   const { firebaseUser } = useNullableUserContext();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!router.isReady || !firebaseUser) return;
+    if (!router.isReady || !data) return;
     const fileId = router.query.id;
 
     invariant(typeof fileId === 'string', 'Expected fileId to be a string');
@@ -20,14 +21,14 @@ export default function CopyFilePage(): JSX.Element {
     const queryId: string = fileId;
 
     (async () => {
-      const token = await firebaseUser.getIdToken(true); // we need to force refresh to update display name
+      // const token = await firebaseUser.getIdToken(true); // we need to force refresh to update display name
       const resp = await fetch(`/api/copyFile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          idToken: token,
+          // idToken: token,
           fileID: queryId,
         }),
       });
@@ -42,7 +43,7 @@ export default function CopyFilePage(): JSX.Element {
         }
       }
     })();
-  }, [router.isReady, firebaseUser]);
+  }, [router.isReady, data]);
 
   if (error) {
     return <MessagePage message={'Error: ' + error} />;

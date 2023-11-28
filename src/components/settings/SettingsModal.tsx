@@ -25,6 +25,10 @@ import { EditorMode, useUserContext } from '../../context/UserContext';
 import { FileSettings, useEditorContext } from '../../context/EditorContext';
 import useUserPermission from '../../hooks/useUserPermission';
 import firebase from 'firebase/app';
+import {signOut, useSession} from "next-auth/react";
+import {directus} from "@/services/directus";
+import {readItems, updateItem, updateMe} from "@directus/sdk";
+import {useRouter} from "next/router";
 
 export interface SettingsDialogProps {
   isOpen: boolean;
@@ -41,12 +45,7 @@ const tabs = [
     id: 'user',
     label: 'User',
     icon: UserIcon,
-  },
-  {
-    id: 'judge',
-    label: 'Judge',
-    icon: ServerIcon,
-  },
+  }
 ] as const;
 
 export const SettingsModal = ({
@@ -81,11 +80,11 @@ export const SettingsModal = ({
   const [tab, setTab] = useState<typeof tabs[number]['id']>('workspace');
 
   const [judgeResults, setJudgeResults] = useJudgeResults();
-
+  const {data} = useSession()
   useEffect(() => {
     if (isOpen) {
       setFileSettings(realFileSettings);
-      setName(firebaseUser.displayName ?? ''); // todo this shouldn't really be an empty string ever?
+      setName( `${data?.user.first_name} ${data?.user.last_name}`); // todo this shouldn't really be an empty string ever?
       setEditorMode(userData.editorMode);
       setTabSize(userData.tabSize);
       setLightMode(userData.lightMode);
@@ -106,7 +105,7 @@ export const SettingsModal = ({
       onClose();
     }
   };
-
+  const router = useRouter()
   const saveAndClose = async () => {
     if (!name) {
       alert('User Name cannot be empty. Fix before saving.');
@@ -162,13 +161,22 @@ export const SettingsModal = ({
     updateRealFileData({
       settings: { ...realFileSettings, ...settingsToSet },
     });
-    firebase
-      .database()
-      .ref(`users/${firebaseUser.uid}/data`)
-      .update({ editorMode, tabSize, lightMode });
-    if (name !== firebaseUser.displayName) {
-      updateUsername(name);
-    }
+    // firebase
+    //   .database()
+    //   .ref(`users/${firebaseUser.uid}/data`)
+    //   .update({ editorMode, tabSize, lightMode });
+    // if (name !== firebaseUser.displayName) {
+    //   updateUsername(name);
+    // }
+    const client = directus(data?.user?.access_token ?? "")
+    const res = await client.request(updateMe({
+      editorMode, tabSize, lightMode
+    })).catch(async e => {
+      if (e?.errors?.[0]?.extensions?.code === 'TOKEN_EXPIRED') {
+        await signOut()
+        return router.push("/Login")
+      }
+    })
     onClose();
   };
 
